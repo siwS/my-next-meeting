@@ -16,8 +16,14 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
+	"time"
 
 	"github.com/spf13/cobra"
+	gcalendar "github.com/spf13/my-next-meeting/lib"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/calendar/v3"
 )
 
 // cancelCmd represents the cancel command
@@ -31,8 +37,53 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("cancel called")
+		b, err := ioutil.ReadFile("calendar.config")
+		if err != nil {
+			log.Fatalf("Unable to read client secret file: %v", err)
+		}
+
+		// If modifying these scopes, delete your previously saved token.json.
+		config, err := google.ConfigFromJSON(b, calendar.CalendarEventsScope, "https://www.googleapis.com/auth/userinfo.email")
+		if err != nil {
+			log.Fatalf("Unable to parse client secret file to config: %v", err)
+		}
+
+		client := gcalendar.GetClient(config)
+		user := gcalendar.GetLoggedInUser(client)
+
+		srv, err := calendar.New(client)
+		if err != nil {
+			log.Fatalf("Unable to retrieve Calendar client: %v", err)
+		}
+
+		t := time.Now().Format(time.RFC3339)
+		events, err := srv.Events.List("primary").ShowDeleted(false).
+			SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
+		if err != nil {
+			log.Fatalf("Unable to retrieve next ten of the user's events: %v", err)
+		}
+		if len(events.Items) == 0 {
+			fmt.Println("No upcoming events found to cancel.")
+		} else {
+			item := events.Items[0]
+			att := findAttendee(item.Attendees, user.Email)
+			att.ResponseStatus = "declined"
+
+			_, err := srv.Events.Patch("primary", item.Id, item).Do()
+			if err != nil {
+				log.Fatalf("Unable to cancel event: %v", err)
+			}
+		}
 	},
+}
+
+func findAttendee(attendees []*calendar.EventAttendee, email string) (ret *calendar.EventAttendee) {
+	for _, att := range attendees {
+		if att.Email == email {
+			return att
+		}
+	}
+	return
 }
 
 func init() {

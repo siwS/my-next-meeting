@@ -17,6 +17,7 @@ package gcalendar
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -25,7 +26,16 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Retrieve a token, saves the token, then returns the generated client.
+// User is a struct to keep the authenticated user info
+type User struct {
+	// AnyoneCanAddSelf: Whether anyone can invite themselves to the event
+	// (currently works for Google+ events only). Optional. The default is
+	// False.
+	Email         string `json:"email"`
+	EmailVerified string `json:"email_verified"`
+}
+
+// GetClient retrieves a token, saves the token, then returns the generated client.
 func GetClient(config *oauth2.Config) *http.Client {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
@@ -37,6 +47,19 @@ func GetClient(config *oauth2.Config) *http.Client {
 		saveToken(tokFile, tok)
 	}
 	return config.Client(context.Background(), tok)
+}
+
+// GetLoggedInUser returns the currently logged in user.
+func GetLoggedInUser(client *http.Client) (ret User) {
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	data, _ := ioutil.ReadAll(resp.Body)
+	var user User
+	json.Unmarshal(data, &user)
+	return user
 }
 
 // Request a token from the web, then returns the retrieved token.
