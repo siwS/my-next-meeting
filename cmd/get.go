@@ -24,26 +24,20 @@ import (
 	gcalendar "github.com/spf13/my-next-meeting/lib"
 
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/calendar/v3"
+	calendar "google.golang.org/api/calendar/v3"
 )
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
 	Use:   "get",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Get your next Google Calendar meeting",
+	Long:  `Using the Google Calendar API get your next meeting and all its details: Summary, Details, Date, Attendees, Location, Hangout Link`,
 	Run: func(cmd *cobra.Command, args []string) {
 		b, err := ioutil.ReadFile("calendar.config")
 		if err != nil {
 			log.Fatalf("Unable to read client secret file: %v", err)
 		}
 
-		// If modifying these scopes, delete your previously saved token.json.
 		config, err := google.ConfigFromJSON(b, calendar.CalendarEventsScope)
 		if err != nil {
 			log.Fatalf("Unable to parse client secret file to config: %v", err)
@@ -55,45 +49,58 @@ to quickly create a Cobra application.`,
 			log.Fatalf("Unable to retrieve Calendar client: %v", err)
 		}
 
-		t := time.Now().Format(time.RFC3339)
-		events, err := srv.Events.List("primary").ShowDeleted(false).
-			SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
-		if err != nil {
-			log.Fatalf("Unable to retrieve next ten of the user's events: %v", err)
-		}
-		if len(events.Items) == 0 {
+		event := gcalendar.GetNextEvent(srv)
+		if event == nil {
 			fmt.Println("No upcoming events found.")
 		} else {
-			fmt.Println("Your next event is:")
-			item := events.Items[0]
-			date := item.Start.DateTime
-			if date == "" {
-				date = item.Start.Date
-			}
-			attendeeEmail := ""
-			if len(item.Attendees) > 0 {
-				attendeeEmail = item.Attendees[0].Email
-			}
-			fmt.Printf("'%v' and will happen on %v\n", item.Summary, date)
-			fmt.Printf("%v\n", item.Description)
-			fmt.Printf("Who will attend: %v\n", attendeeEmail)
-			fmt.Printf("Organised by: %v\n", item.Organizer.Email)
-			fmt.Printf("You can dial in here: %v\n", item.HangoutLink)
-			fmt.Printf("Or physically attend here: %v\n", item.Location)
+			printEventDetails(event)
 		}
 	},
 }
 
+func printEventDetails(event *calendar.Event) {
+	fmt.Println("Your next meeting is:")
+
+	date := event.Start.DateTime
+	if date == "" {
+		date = event.Start.Date
+	}
+
+	fmt.Printf("'%v' and is scheduled for %v\n", event.Summary, parseAndFormatDate(date))
+
+	if event.Description != "" {
+		fmt.Printf("%v \n", event.Description)
+	}
+
+	fmt.Printf("Organised by: %v\n", event.Organizer.Email)
+
+	fmt.Printf("Attendees:")
+	for _, attendee := range event.Attendees {
+		fmt.Printf("%v \n", attendee.Email)
+	}
+
+	if event.HangoutLink != "" {
+		fmt.Printf("You can dial in here: %v\n", event.HangoutLink)
+	}
+
+	if event.Location != "" {
+		fmt.Printf("Event location is: %v\n", event.Location)
+	}
+}
+
+func parseAndFormatDate(date string) string {
+	layout := "2006-01-02T15:04:05+01:00"
+	printLayout := "2006-01-02 15:04"
+
+	dateParsed, err := time.Parse(layout, date)
+	if err != nil {
+		log.Fatalf("Unable to parse date correctly: %v", err)
+	}
+
+	dateFormatted := dateParsed.Format(printLayout)
+	return dateFormatted
+}
+
 func init() {
 	rootCmd.AddCommand(getCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// getCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// getCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"time"
 
 	"github.com/spf13/cobra"
 	gcalendar "github.com/spf13/my-next-meeting/lib"
@@ -29,26 +28,24 @@ import (
 // cancelCmd represents the cancel command
 var cancelCmd = &cobra.Command{
 	Use:   "cancel",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Cancel your next Google Calendar meeting",
+	Long:  `Using the Google Calendar API cancel your next meeting optionally providing a related comment.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		const userInfoScope = "https://www.googleapis.com/auth/userinfo.email"
+
 		b, err := ioutil.ReadFile("calendar.config")
 		if err != nil {
 			log.Fatalf("Unable to read client secret file: %v", err)
 		}
 
-		// If modifying these scopes, delete your previously saved token.json.
-		config, err := google.ConfigFromJSON(b, calendar.CalendarEventsScope, "https://www.googleapis.com/auth/userinfo.email")
+		// get config for google client
+		config, err := google.ConfigFromJSON(b, calendar.CalendarEventsScope, userInfoScope)
 		if err != nil {
 			log.Fatalf("Unable to parse client secret file to config: %v", err)
 		}
 
 		client := gcalendar.GetClient(config)
+
 		user := gcalendar.GetLoggedInUser(client)
 
 		srv, err := calendar.New(client)
@@ -56,20 +53,18 @@ to quickly create a Cobra application.`,
 			log.Fatalf("Unable to retrieve Calendar client: %v", err)
 		}
 
-		t := time.Now().Format(time.RFC3339)
-		events, err := srv.Events.List("primary").ShowDeleted(false).
-			SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
-		if err != nil {
-			log.Fatalf("Unable to retrieve next ten of the user's events: %v", err)
-		}
-		if len(events.Items) == 0 {
+		event := gcalendar.GetNextEvent(srv)
+		if event == nil {
 			fmt.Println("No upcoming events found to cancel.")
 		} else {
-			item := events.Items[0]
-			att := findAttendee(item.Attendees, user.Email)
+			att := findAttendee(event.Attendees, user.Email)
 			att.ResponseStatus = "declined"
 
-			_, err := srv.Events.Patch("primary", item.Id, item).Do()
+			comment, _ := cmd.Flags().GetString("comment")
+			if comment != "" {
+				att.Comment = comment
+			}
+			_, err := srv.Events.Patch("primary", event.Id, event).Do()
 			if err != nil {
 				log.Fatalf("Unable to cancel event: %v", err)
 			}
@@ -88,14 +83,5 @@ func findAttendee(attendees []*calendar.EventAttendee, email string) (ret *calen
 
 func init() {
 	rootCmd.AddCommand(cancelCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// cancelCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// cancelCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	cancelCmd.Flags().StringP("comment", "c", "", "Add a comment in your response")
 }

@@ -21,48 +21,65 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
+	"google.golang.org/api/calendar/v3"
 )
 
-// User is a struct to keep the authenticated user info
+// User keeps the authenticated user information
 type User struct {
-	// AnyoneCanAddSelf: Whether anyone can invite themselves to the event
-	// (currently works for Google+ events only). Optional. The default is
-	// False.
 	Email         string `json:"email"`
 	EmailVerified string `json:"email_verified"`
 }
 
-// GetClient retrieves a token, saves the token, then returns the generated client.
+// GetClient retrieves a token, saves it, and returns the generated client
 func GetClient(config *oauth2.Config) *http.Client {
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	tokFile := "token.json"
-	tok, err := tokenFromFile(tokFile)
+	tokenFile := "token.json"
+	token, err := tokenFromFile(tokenFile)
 	if err != nil {
-		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
+		token = getTokenFromWeb(config)
+		saveToken(tokenFile, token)
 	}
-	return config.Client(context.Background(), tok)
+	return config.Client(context.Background(), token)
 }
 
-// GetLoggedInUser returns the currently logged in user.
+// GetLoggedInUser returns the currently logged in user
 func GetLoggedInUser(client *http.Client) (ret User) {
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		return
+		log.Fatalf("Unable to get user authentication information: %v", err)
 	}
+
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, err := ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		log.Fatalf("Unable to read response body: %v", err)
+	}
+
 	var user User
 	json.Unmarshal(data, &user)
 	return user
 }
 
-// Request a token from the web, then returns the retrieved token.
+// GetNextEvent gets the next event for the user
+func GetNextEvent(client *calendar.Service) *calendar.Event {
+	t := time.Now().Format(time.RFC3339)
+	events, err := client.Events.List("primary").ShowDeleted(false).
+		SingleEvents(true).TimeMin(t).MaxResults(1).OrderBy("startTime").Do()
+
+	if err != nil {
+		log.Fatalf("Unable to retrieve next user event: %v", err)
+	}
+	return events.Items[0]
+}
+
+// getTokenFromWeb requests a token from the web, then returns the retrieved token
 func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	fmt.Printf("Go to the following link in your browser then type the "+
@@ -80,7 +97,7 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	return tok
 }
 
-// Retrieves a token from a local file.
+// tokenFromFile retrieves a token from a local file.
 func tokenFromFile(file string) (*oauth2.Token, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -92,7 +109,7 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	return tok, err
 }
 
-// Saves a token to a file path.
+// saveToken saves a token to a file path.
 func saveToken(path string, token *oauth2.Token) {
 	fmt.Printf("Saving credential file to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
