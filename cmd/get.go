@@ -90,6 +90,7 @@ func printEventDetails(event *calendar.Event) {
 
 func parseAndFormatDate(date string) string {
 	layout := "2006-01-02T15:04:05+01:00"
+	// https://flaviocopes.com/go-date-time-format/
 	printLayout := "2006-01-02 15:04"
 
 	dateParsed, err := time.Parse(layout, date)
