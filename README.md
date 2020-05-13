@@ -25,10 +25,10 @@ To install locally:
 
 5. Create a token.json file
 
-You need to create a `token.json` file in the project root directory with your Google Access and Refresh Token. 
-Those are needed for the Google OAuth flow.
-For information on how to get the keys, check the [Google Calendar Quickstart Guide](https://developers.google.com/calendar/quickstart/go).
-*Note: do not share, or commit those on Github repos, keep them safe.*
+You need to create a `token.json` file in the project root directory with your Google Access and Refresh Token.\
+Those are needed for the Google OAuth flow.\
+For information on how to get the keys, check the [Google Calendar Quickstart Guide](https://developers.google.com/calendar/quickstart/go).\
+*Note: do not share, or commit those on Github repos, keep them safe.*\
 
 6. Build the project
 
@@ -42,13 +42,13 @@ For information on how to get the keys, check the [Google Calendar Quickstart Gu
 
 ## Usage
 
-Usage:
-  my-next-meeting [command]
+Usage: `my-next-meeting [command]`
+
 
 Available Commands:
-  cancel      Cancel your next Google Calendar meeting
-  get         Get your next Google Calendar meeting
-  help        Help about any command
+-  cancel      Cancel your next Google Calendar meeting
+-  get         Get your next Google Calendar meeting
+-  help        Help about any command
 
 ### TODO:
 
