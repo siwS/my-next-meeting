@@ -28,7 +28,7 @@ To install locally:
 You need to create a `token.json` file in the project root directory with your Google Access and Refresh Token.\
 Those are needed for the Google OAuth flow.\
 For information on how to get the keys, check the [Google Calendar Quickstart Guide](https://developers.google.com/calendar/quickstart/go).\
-*Note: do not share, or commit those on Github repos, keep them safe.*\
+*Note: do not share, or commit those on Github repos, keep them safe.*
 
 6. Build the project
 
